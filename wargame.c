@@ -1,6 +1,8 @@
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <math.h>
  
  
 #define NB_LIGNES 10
@@ -46,13 +48,13 @@ int f_convert_char2int(char c)
 }
  
 //Listes 
-liste_plateau* createNode(Pion* plateau) {
-    liste_plateau* newNode = (liste_plateau*)malloc(sizeof(liste_plateau));
+listeP* createNode(Pion* plateau) {
+    listeP* newNode = (listeP*)malloc(sizeof(listeP));
     if (!newNode) {
         printf("Memory allocation failed catastrophically!\n");
         exit(1);
     }
-    newNode.current = plateau;
+    newNode->current = plateau;
     newNode->suivant = NULL;
     return newNode;
 }
@@ -60,7 +62,7 @@ liste_plateau* createNode(Pion* plateau) {
 void inserTete(struct liste_plateau** tete, Pion* plateau) {
     struct liste_plateau* newNode = createNode(plateau);
     newNode->suivant = *tete;
-    *head = newNode;
+    *tete = newNode;
 }
  
 char f_convert_int2char(int i)
@@ -346,6 +348,34 @@ int f_bataille(int l, int c)
  
 	return plateauDeJeu[l*NB_COLONNES+c].couleur;
 }
+
+/*Bataille utilisable sur des plateaux théorique*/
+int f_bataille2(int l, int c,Pion* jeu)
+{
+	int i, j, mini, maxi, minj, maxj;
+	int somme=0;
+ 
+	mini = l-1<0?0:l-1;
+	maxi = l+1>NB_LIGNES-1?NB_LIGNES-1:l+1;
+	minj = c-1<0?0:c-1;
+	maxj = c+1>NB_COLONNES-1?NB_COLONNES-1:c+1;
+ 
+	for(i=mini; i<=maxi; i++)
+	{
+		for(j=minj; j<=maxj; j++)
+		{
+			somme += jeu[i*NB_COLONNES+j].couleur*jeu[i*NB_COLONNES+j].valeur;
+		}
+	}
+	somme -= jeu[l*NB_COLONNES+c].couleur*jeu[l*NB_COLONNES+c].valeur;
+ 
+	if(somme < 0)
+		return -1;
+	if(somme > 0)
+		return 1;
+ 
+	return jeu[l*NB_COLONNES+c].couleur;
+}
  
  
 /**
@@ -506,32 +536,73 @@ Pion* f_raz_plateau()
 	}
 	return jeu;
 }
-void f_max(Pion* plateau, int profondeur);
+
+
+listeP* liste_possibles(Pion* plateau, int couleur){
+    int i, j, di, dj;
+    listeP* lP = NULL;
+    Pion* copie;
+
+    for (i = 0; i < NB_LIGNES; i++){
+        for (j = 0; j < NB_COLONNES; j++){
+            if (plateau[i * NB_COLONNES + j].couleur == couleur){
+                for (di = -1; di <= 1; di++){
+                    for (dj = -1; dj <= 1; dj++){
+                        if (di != 0 || dj != 0){
+                            if (f_test_mouvement(plateau, i, j,i + di, j + dj,couleur) == 0){
+                                /*car dommage copie tableau renvoit pas un tableau*/ 
+                                copie = malloc(NB_LIGNES * NB_COLONNES* sizeof(Pion));
+
+                                if (copie == NULL){
+                                    //ERREUR catastrophically
+                                    printf("Memory allocation failed catastrophically!\n");
+                                    return NULL;
+                                }
+                                f_copie_plateau(plateau, copie);
+                                f_bouge_piece(copie, i, j,i + di, j + dj,couleur);
+
+                                /* On stocke l'addresse de LP car on veut changer notre lP local 
+                                et insertête attend pointeur vers pointeur vers une liste de plateau car horrible*/
+                                inserTete(&lP, copie);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    return lP;
+}
+
+
+//bad perspective: do you know who you're evalutaitng?
+int f_max(Pion* plateau, int profondeur, int couleur);
 //Fonction min trouve le minimum des noeuds fils
-void f_min(Pion* plateau, int profondeur, int couleur)
+int f_min(Pion* plateau, int profondeur, int couleur)
 		{
-		    listeP possibles=liste_possibles(plateau);
+		    listeP* possibles=liste_possibles(plateau, couleur);
 		    int min=INFINI;
 	        if(profondeur>PROF_LIMITE){
 	            return f_eval(plateau,-couleur);
 	        }
 	        while (possibles!=NULL){
-	            min=fmin(min,f_max(possibles.current,profondeur+1,couleur));
+	            min=fmin(min,f_max(possibles->current,profondeur+1,couleur));
 	            possibles=possibles->suivant;
 	        }
 	        return min;
 		}
  
 //Fonction max trouve le maximum des noeuds fils
-void f_max(Pion* plateau, int profondeur,int couleur)
+int f_max(Pion* plateau, int profondeur,int couleur)
 		{
-		    listeP possibles=liste_possibles(plateau);
+		    listeP* possibles=liste_possibles(plateau, couleur);
 		    int max=-INFINI;
 	        if(profondeur>PROF_LIMITE){
 	            return f_eval(plateau,couleur);
 	        }
 	        while (possibles!=NULL){
-	            max=fmax(max,f_min(possibles.current,profondeur+1,couleur));
+	            max=fmax(max,f_min(possibles->current,profondeur+1,couleur));
 	            possibles=possibles->suivant;
 	        }
 	        return max;
@@ -544,13 +615,7 @@ void minimax(int profondeur, Pion* plateau){
  
 }
  
-liste_possibles(Pion* plateau){
-    listeP lP;
-    for(){
-        inserTete(lP);
-    }
-    return lP;
-}
+
  
 /**
  * Calcule et joue le meilleur cout
@@ -560,7 +625,8 @@ void f_IA(int joueur)
 #ifdef DEBUG
 	printf("dbg: entering %s %d\n", __FUNCTION__, __LINE__);
 #endif
-    Pion* plateau = f_copie_plateau(plateauDeJeu);
+    Pion* copiePlateau = Malloc naze;
+    f_copie_plateau(plateauDeJeu,copie);
  
 	/** A remplir **/
  
