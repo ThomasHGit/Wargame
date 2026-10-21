@@ -498,12 +498,22 @@ int f_valeur(Pion* jeu, int joueur)
 	}
 	return valeur;
 }
- 
+
+
+//Calcul la compaction définie comme le nombre moyen de pion autour d'un pion pour un joueur donnée
+int f_score_compaction(Pion* jeu, int joueur){
+    
+}
+ //attention pb de cohérence 
 //fonction d'évaluation
 int f_eval(Pion* jeu,int joueur)
 {
- 
-	return (f_valeur(jeu,joueur)-f_valeur(jeu,-joueur))+(INFINI*f_gagnant2(jeu));
+    int pointsPuissancePion=(f_valeur(jeu,joueur)-f_valeur(jeu,-joueur));
+    int pointsNbPion=f_nbPions(jeu,joueur)-f_nbPions(jeu,-joueur);
+    int distancePoint=f_distance_moyenne(jeu,joueur)-f_distance_moyenne(jeu,-joueur);
+    int distanceMinPoint=f_distance_minimale(jeu,joueur)-f_distance_minimale(jeu,-joueur);
+    int score_compaction=f_score_compaction(jeu,joueur);
+	return pointsPuissancePion+pointsNbPion+distancePoint+distanceMinPoint+score_compaction+(INFINI*f_gagnant2(jeu));
 }
  
 //copie du plateau
@@ -613,11 +623,7 @@ int f_max(Pion* plateau, int profondeur,int couleur)
  
 void minimax(int profondeur, Pion* plateau){
  
-}
 
-int score_compaction(){
-    
-}
  
 
  
