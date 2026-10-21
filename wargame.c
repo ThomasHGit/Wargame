@@ -537,7 +537,7 @@ Pion* f_raz_plateau()
 	return jeu;
 }
 
-
+/*liste de tout les plateaux suivant possibles pour un plateau*/
 listeP* liste_possibles(Pion* plateau, int couleur){
     int i, j, di, dj;
     listeP* lP = NULL;
@@ -587,7 +587,7 @@ int f_min(Pion* plateau, int profondeur, int couleur)
 	            return f_eval(plateau,-couleur);
 	        }
 	        while (possibles!=NULL){
-	            min=fmin(min,f_max(possibles->current,profondeur+1,couleur));
+	            min=fmin(min,f_max(possibles->current,profondeur+1,-couleur));
 	            possibles=possibles->suivant;
 	        }
 	        return min;
@@ -602,7 +602,7 @@ int f_max(Pion* plateau, int profondeur,int couleur)
 	            return f_eval(plateau,couleur);
 	        }
 	        while (possibles!=NULL){
-	            max=fmax(max,f_min(possibles->current,profondeur+1,couleur));
+	            max=fmax(max,f_min(possibles->current,profondeur+1,-couleur));
 	            possibles=possibles->suivant;
 	        }
 	        return max;
@@ -613,6 +613,10 @@ int f_max(Pion* plateau, int profondeur,int couleur)
  
 void minimax(int profondeur, Pion* plateau){
  
+}
+
+int score_compaction(){
+    
 }
  
 
@@ -625,9 +629,13 @@ void f_IA(int joueur)
 #ifdef DEBUG
 	printf("dbg: entering %s %d\n", __FUNCTION__, __LINE__);
 #endif
-    Pion* copiePlateau = Malloc naze;
-    f_copie_plateau(plateauDeJeu,copie);
- 
+    //Pion* copiePlateau = Malloc naze;
+    //f_copie_plateau(plateauDeJeu,copiePlateau);
+    
+    //truc nul on retournera quelque chose de mieux avec une structure de move et un best move pointeur(ou pas???) à passer
+    int meilleur_score = -INFINI;
+    f_bouge_piece(plateauDeJeu, int l1, int c1, int l2, int c2, int couleur);
+    
 	/** A remplir **/
  
 #ifdef DEBUG
