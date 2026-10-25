@@ -631,7 +631,7 @@ int f_eval(Pion* jeu, int joueur)
 	+pointsNbPion
 	-pointsNbPionAdverse
 	-(distancePoint*2)
-	-distanceMinPoint/2
+	-distanceMinPoint
 	+minAdversaire*2
 	+score_compaction/2;
 
