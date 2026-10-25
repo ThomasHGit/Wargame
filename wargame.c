@@ -826,7 +826,7 @@ int f_alphabeta(Pion* plateau, int profondeur, int couleur, int alpha, int beta,
 Coup alphabeta(Pion* plateau, int profondeur, int couleur)
 {
 	Coup coupMiniMax = {0, 0, 0, 0};
-	f_alphabeta(plateau, profondeur, couleur, -INFINI, INFINI, 1, &coupMiniMax);
+	f_alphabeta(plateau, profondeur, couleur, -INFINI, INFINI, couleur, &coupMiniMax);
 	return coupMiniMax;
 }
 
