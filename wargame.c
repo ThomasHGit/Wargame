@@ -3,7 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
- 
+ //joueur positif c'est les noirs donc en haut
  
 #define NB_LIGNES 10
 #define NB_COLONNES 10
@@ -18,13 +18,22 @@ typedef struct pion_s
 	int valeur;
 }Pion;
  
- 
+//bandaid
+typedef struct {
+    int l1, c1;  
+    int l2, c2;
+} Coup; 
+
 typedef struct liste_plateau
 {
     Pion* current;
     struct liste_plateau* suivant;
+	Coup coup;
 }listeP;
  
+
+
+
 //typedef struct 
  
 Pion *plateauDeJeu;
@@ -48,7 +57,7 @@ int f_convert_char2int(char c)
 }
  
 //Listes 
-listeP* createNode(Pion* plateau) {
+listeP* createNode(Pion* plateau, Coup coup) {
     listeP* newNode = (listeP*)malloc(sizeof(listeP));
     if (!newNode) {
         printf("Memory allocation failed catastrophically!\n");
@@ -56,11 +65,12 @@ listeP* createNode(Pion* plateau) {
     }
     newNode->current = plateau;
     newNode->suivant = NULL;
+	newNode->coup = coup;
     return newNode;
 }
  
-void inserTete(struct liste_plateau** tete, Pion* plateau) {
-    struct liste_plateau* newNode = createNode(plateau);
+void inserTete(struct liste_plateau** tete, Pion* plateau, Coup coup) {
+    struct liste_plateau* newNode = createNode(plateau,coup);
     newNode->suivant = *tete;
     *tete = newNode;
 }
@@ -462,6 +472,55 @@ int f_bouge_piece(Pion *plateau, int l1, int c1, int l2, int c2, int couleur)
 #endif
 	return 0;
 }
+
+/**
+ * Pareil que f_bouge_piece mais utilise la bonne fonction bataille pour des plateaux hypothétiques
+ * */
+int f_bouge_piece2(Pion* plateau, int l1, int c1, int l2, int c2, int couleur)
+{
+	int gagnant=0;
+ 
+ 
+#ifdef DEBUG
+	printf("dbg: entering %s %d\n", __FUNCTION__, __LINE__);
+#endif
+ 
+	if(f_test_mouvement(plateau, l1, c1, l2, c2, couleur) != 0)
+		return 1;
+ 
+ 
+	/* Cas ou il n'y a personne a l'arrivee */
+	if(plateau[l2*NB_COLONNES+c2].valeur == 0)
+	{
+		plateau[l2*NB_COLONNES+c2].couleur = plateau[l1*NB_COLONNES+c1].couleur;
+		plateau[l2*NB_COLONNES+c2].valeur = plateau[l1*NB_COLONNES+c1].valeur;
+		plateau[l1*NB_COLONNES+c1].couleur = 0;
+		plateau[l1*NB_COLONNES+c1].valeur = 0;
+	}
+	else
+	{
+		gagnant=f_bataille2(l2, c2, plateau);
+		/* victoire */
+		if(gagnant == couleur)
+		{
+			plateau[l2*NB_COLONNES+c2].couleur = plateau[l1*NB_COLONNES+c1].couleur;
+			plateau[l2*NB_COLONNES+c2].valeur = plateau[l1*NB_COLONNES+c1].valeur;
+			plateau[l1*NB_COLONNES+c1].couleur = 0;
+			plateau[l1*NB_COLONNES+c1].valeur = 0;
+		}
+		/* defaite */
+		else if(gagnant != 0)
+		{
+			plateau[l1*NB_COLONNES+c1].couleur = 0;
+			plateau[l1*NB_COLONNES+c1].valeur = 0;
+		}
+	}
+ 
+#ifdef DEBUG
+	printf("dbg: exiting %s %d\n", __FUNCTION__, __LINE__);
+#endif
+	return 0;
+}
  
 //Calcul du nombre de pions sur le plateau du joueur
 int f_nbPions(Pion* jeu, int joueur)
@@ -480,40 +539,102 @@ int f_nbPions(Pion* jeu, int joueur)
 	}
 	return nbPion;
 }
+
+
  
 //Calcul de la valeur de tous les pions du joueur
-int f_valeur(Pion* jeu, int joueur)
+int f_valeur(Pion* jeu, int joueur, int i, int j)
 {
-	int i, j;
-	int valeur=0;
-	for (i = 0; i < NB_COLONNES; ++i)
-	{
-		for (j = 0; j < NB_LIGNES; ++j)
-		{
-			if (jeu[i * NB_COLONNES + j].couleur == joueur)
-			{
-				valeur += jeu[i * NB_COLONNES + j].valeur;
-			}
-		}
-	}
-	return valeur;
+	if (jeu[i*NB_COLONNES+j].couleur==joueur)
+		return jeu[i*NB_COLONNES+j].valeur;
+	return 0;
 }
 
+int f_distance_totale(Pion* jeu,int couleur,int i,int j)
+{
+	if (jeu[i*NB_COLONNES+j].couleur== couleur)
+	{
+		if (couleur==1)
+			return i;
+		return NB_LIGNES-1-i;
+	}
+	return 0;
+}
 
-//Calcul la compaction définie comme le nombre moyen de pion autour d'un pion pour un joueur donnée
-int f_score_compaction(Pion* jeu, int joueur){
-    
+int f_distance_minimale(Pion* jeu, int couleur, int i, int j)
+{
+	if (jeu[i * NB_COLONNES + j].couleur == couleur)
+	{
+		if (couleur == 1)
+			return i;
+		return NB_LIGNES - 1 - i;
+	}
+	return NB_LIGNES;
+}
+
+//Calcul la compaction définie comme le nombre total de valeur de pion autour d'un pion pour un joueur donnée
+int f_score_compaction(Pion* jeu, int couleur,int l, int c){
+    int i, j, mini, maxi, minj, maxj;
+	int score=0;
+ 
+	mini = l-1<0?0:l-1;
+	maxi = l+1>NB_LIGNES-1?NB_LIGNES-1:l+1;
+	minj = c-1<0?0:c-1;
+	maxj = c+1>NB_COLONNES-1?NB_COLONNES-1:c+1;
+ 
+	for(i=mini; i<=maxi; i++)
+	{
+		for(j=minj; j<=maxj; j++)
+		{
+		    if(jeu[i*NB_COLONNES+j].couleur==couleur){
+		      score +=jeu[i*NB_COLONNES+j].valeur;
+		    }
+		}
+	}
+	score -= jeu[l*NB_COLONNES+c].valeur;
+	return score;
 }
  //attention pb de cohérence 
 //fonction d'évaluation
-int f_eval(Pion* jeu,int joueur)
+int f_eval(Pion* jeu, int joueur)
 {
-    int pointsPuissancePion=(f_valeur(jeu,joueur)-f_valeur(jeu,-joueur));
-    int pointsNbPion=f_nbPions(jeu,joueur)-f_nbPions(jeu,-joueur);
-    int distancePoint=f_distance_moyenne(jeu,joueur)-f_distance_moyenne(jeu,-joueur);
-    int distanceMinPoint=f_distance_minimale(jeu,joueur)-f_distance_minimale(jeu,-joueur);
-    int score_compaction=f_score_compaction(jeu,joueur);
-	return pointsPuissancePion+pointsNbPion+distancePoint+distanceMinPoint+score_compaction+(INFINI*f_gagnant2(jeu));
+	int i, j;
+	int pointsPuissancePion=0;
+	int pointsNbPion=0;
+	int pointsNbPionAdverse=0;
+	int distancePoint=0;
+	int distanceMinPoint=NB_LIGNES;
+	int minAdversaire=NB_LIGNES;
+	int score_compaction=0;
+	int gagne=f_gagnant2(jeu);
+	if(gagne!=0){
+	    return ((INFINI/5)*joueur*gagne);
+	}
+	for (i = 0; i < NB_LIGNES; i++)
+	{
+		for (j = 0; j < NB_COLONNES; j++)
+		{
+			pointsPuissancePion += f_valeur(jeu, joueur, i, j) - f_valeur(jeu, -joueur,i,j);
+			pointsNbPion += (jeu[i*NB_COLONNES+j].couleur ==joueur);
+			pointsNbPionAdverse += -(jeu[i * NB_COLONNES+j].couleur== -joueur);
+			distancePoint += f_distance_totale(jeu, joueur, i, j) - f_distance_totale(jeu, -joueur,i,j);
+			distanceMinPoint = fmin(distanceMinPoint, f_distance_minimale(jeu, joueur,i,j));
+			minAdversaire = fmin(minAdversaire, f_distance_minimale(jeu, -joueur,i,j));
+			score_compaction+=f_score_compaction(jeu, joueur, i, j)-f_score_compaction(jeu, -joueur, i, j);
+		}
+	}
+	if(pointsNbPion==0){
+	    return -(INFINI/5);
+	}
+	distanceMinPoint -= minAdversaire;
+	return pointsPuissancePion
+	+pointsNbPion
+	-pointsNbPionAdverse
+	-(distancePoint*2)
+	-distanceMinPoint/2
+	+minAdversaire*2
+	+score_compaction/2;
+
 }
  
 //copie du plateau
@@ -529,6 +650,14 @@ void f_copie_plateau(Pion* source, Pion* destination)
 		}
 	}
 }
+
+//solution trouvé pour une copie plus éfficace, uniquement pour optimiser la vitesse
+void f_copie_plateau2(Pion* source, Pion* destination)
+{
+	memcpy(destination, source, NB_LIGNES * NB_COLONNES * sizeof(Pion));
+}
+
+
  
 //mise a zero du plateau
 Pion* f_raz_plateau()
@@ -568,12 +697,14 @@ listeP* liste_possibles(Pion* plateau, int couleur){
                                     printf("Memory allocation failed catastrophically!\n");
                                     return NULL;
                                 }
-                                f_copie_plateau(plateau, copie);
-                                f_bouge_piece(copie, i, j,i + di, j + dj,couleur);
+                                f_copie_plateau2(plateau, copie);
+                                f_bouge_piece2(copie, i, j,i + di, j + dj,couleur);
 
-                                /* On stocke l'addresse de LP car on veut changer notre lP local 
+                                
+								Coup coup = {i, j, i + di, j + dj};
+								/* On stocke l'addresse de LP car on veut changer notre lP local 
                                 et insertête attend pointeur vers pointeur vers une liste de plateau car horrible*/
-                                inserTete(&lP, copie);
+                                inserTete(&lP, copie,coup);
                             }
                         }
                     }
@@ -587,33 +718,54 @@ listeP* liste_possibles(Pion* plateau, int couleur){
 
 
 //bad perspective: do you know who you're evalutaitng?
-int f_max(Pion* plateau, int profondeur, int couleur);
+int f_max(Pion* plateau, int profondeur, int couleur, Coup* meilleur_coup);
 //Fonction min trouve le minimum des noeuds fils
-int f_min(Pion* plateau, int profondeur, int couleur)
+int f_min(Pion* plateau, int profondeur, int couleur, Coup* meilleur_coup)
 		{
-		    listeP* possibles=liste_possibles(plateau, couleur);
-		    int min=INFINI;
 	        if(profondeur>PROF_LIMITE){
 	            return f_eval(plateau,-couleur);
 	        }
+			listeP* possibles=liste_possibles(plateau, couleur);
+			if(possibles == NULL){
+                return f_eval(plateau, -couleur);
+			}
+		    int min=INFINI;
+			int newMin=0;
 	        while (possibles!=NULL){
-	            min=fmin(min,f_max(possibles->current,profondeur+1,-couleur));
+	            newMin=f_max(possibles->current,profondeur+1,-couleur, meilleur_coup);
+				//passer le coup correspondant en pointeur, prendre le nouveau minimum trouvé
+				if(newMin<min){
+					min=newMin;
+				}
+				listeP* tmp = possibles;
 	            possibles=possibles->suivant;
+	            free(tmp->current);
+                free(tmp);
 	        }
 	        return min;
 		}
  
 //Fonction max trouve le maximum des noeuds fils
-int f_max(Pion* plateau, int profondeur,int couleur)
+int f_max(Pion* plateau, int profondeur,int couleur, Coup* meilleur_coup)
 		{
-		    listeP* possibles=liste_possibles(plateau, couleur);
-		    int max=-INFINI;
 	        if(profondeur>PROF_LIMITE){
 	            return f_eval(plateau,couleur);
 	        }
+			listeP* possibles=liste_possibles(plateau, couleur);
+			int max=-INFINI;
+			int newMax=0;
 	        while (possibles!=NULL){
-	            max=fmax(max,f_min(possibles->current,profondeur+1,-couleur));
+	            newMax=f_min(possibles->current,profondeur+1,-couleur, meilleur_coup);
+				if(newMax>max){
+					max=newMax;
+					if(profondeur == 0){
+					    *meilleur_coup=possibles->coup;
+					}
+				}
+				listeP* tmp = possibles;
 	            possibles=possibles->suivant;
+	            free(tmp->current);
+                free(tmp);
 	        }
 	        return max;
  
@@ -621,8 +773,62 @@ int f_max(Pion* plateau, int profondeur,int couleur)
 		}
  
  
-void minimax(int profondeur, Pion* plateau){
- 
+Coup minimax(Pion* plateau, int profondeur, int couleur){
+	Coup coupMiniMax;
+	int score = f_max(plateau, profondeur,couleur, &coupMiniMax);
+	return coupMiniMax;
+}
+
+
+//alpha/beta
+int f_alphabeta(Pion* plateau, int profondeur, int couleur, int alpha, int beta, int ia, Coup* meilleur_coup){
+	int meilleur;
+	int score;
+	listeP* possibles;
+	listeP* tmp;
+
+	if (profondeur>= PROF_LIMITE || f_gagnant2(plateau)!=0)
+		return f_eval(plateau, ia);
+	possibles = liste_possibles(plateau, couleur);
+	if (possibles==NULL)
+		return f_eval(plateau, ia);
+	if (couleur==ia)
+		meilleur= -INFINI;
+	else
+		meilleur=INFINI;
+	while (possibles!=NULL){
+		tmp=possibles;
+		if (alpha<beta){
+			score=f_alphabeta(possibles->current, profondeur + 1, -couleur, alpha, beta, ia, meilleur_coup);
+			if (couleur==ia){
+				if (score>meilleur){
+					meilleur=score;
+					if (profondeur==0)
+						*meilleur_coup=possibles->coup;}
+				if (meilleur>alpha)
+					alpha=meilleur;
+			}
+			else
+			{
+				if (score<meilleur)
+					meilleur=score;
+				if (meilleur<beta)
+					beta=meilleur;
+			}
+		}
+		possibles = possibles->suivant;
+		free(tmp->current);
+		free(tmp);
+	}
+	return meilleur;
+}
+
+Coup alphabeta(Pion* plateau, int profondeur, int couleur)
+{
+	Coup coupMiniMax = {0, 0, 0, 0};
+	f_alphabeta(plateau, profondeur, couleur, -INFINI, INFINI, 1, &coupMiniMax);
+	return coupMiniMax;
+}
 
  
 
@@ -639,8 +845,12 @@ void f_IA(int joueur)
     //f_copie_plateau(plateauDeJeu,copiePlateau);
     
     //truc nul on retournera quelque chose de mieux avec une structure de move et un best move pointeur(ou pas???) à passer
-    int meilleur_score = -INFINI;
-    f_bouge_piece(plateauDeJeu, int l1, int c1, int l2, int c2, int couleur);
+	Coup coup=alphabeta(plateauDeJeu,0,joueur);
+	int l1=coup.l1;
+	int c1=coup.c1;
+	int l2=coup.l2;
+	int c2=coup.c2;
+    f_bouge_piece(plateauDeJeu, l1, c1, l2, c2, joueur);
     
 	/** A remplir **/
  
